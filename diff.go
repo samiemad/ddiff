@@ -9,6 +9,14 @@ import (
 	"strings"
 )
 
+const (
+	statusUnchanged = "UNCHANGED"
+	statusChanged   = "CHANGED"
+	statusMoved     = "MOVED"
+	statusAdded     = "ADDED"
+	statusDeleted   = "DELETED"
+)
+
 type TreeDiff struct {
 	Files []*FileDiff
 }
@@ -56,22 +64,22 @@ func DiffTrees(t1, t2 *FileTree) *TreeDiff {
 		}
 		if dsc1, ok := dir1ByPath[dsc2.Path]; ok {
 			if dsc1.Hash != dsc2.Hash {
-				res.Files = append(res.Files, &FileDiff{Status: "CHANGED", FileDsc: dsc1})
+				res.Files = append(res.Files, &FileDiff{Status: statusChanged, FileDsc: dsc1})
 			} else {
-				res.Files = append(res.Files, &FileDiff{Status: "UNCHANGED", FileDsc: dsc1})
+				res.Files = append(res.Files, &FileDiff{Status: statusUnchanged, FileDsc: dsc1})
 			}
 			matched[dsc1.Hash]++
 			continue
 		}
 		// Let's try to find the file somewhere else:
 		if dsc1, ok := dir1ByHash[dsc2.Hash]; ok {
-			r := &FileDiff{Status: "MOVED", FileDsc: dsc2}
+			r := &FileDiff{Status: statusMoved, FileDsc: dsc2}
 			r.Path = dsc1[0].Path + " -> " + dsc2.Path
 			res.Files = append(res.Files, r)
 			matched[dsc2.Hash]++
 			continue
 		}
-		res.Files = append(res.Files, &FileDiff{Status: "ADDED", FileDsc: dsc2})
+		res.Files = append(res.Files, &FileDiff{Status: statusAdded, FileDsc: dsc2})
 	}
 	for _, dsc1 := range t1.Files {
 		if dsc1.IsDir {
@@ -79,7 +87,7 @@ func DiffTrees(t1, t2 *FileTree) *TreeDiff {
 		}
 		num := matched[dsc1.Hash]
 		if num == 0 {
-			res.Files = append(res.Files, &FileDiff{Status: "DELETED", FileDsc: dsc1})
+			res.Files = append(res.Files, &FileDiff{Status: statusDeleted, FileDsc: dsc1})
 		} else {
 			matched[dsc1.Hash]--
 		}
@@ -96,12 +104,29 @@ func (d *TreeDiff) String() string {
 	var sb strings.Builder
 	unchanged := 0
 	for _, f := range d.Files {
-		if f.Status == "UNCHANGED" {
+		if f.Status == statusUnchanged {
 			unchanged++
 			continue
 		}
-		sb.WriteString(fmt.Sprintf("%s:\t%s\n", f.Status, f.Path))
+		sb.WriteString(fmt.Sprintf("%s: %s\n", f.FormatStatus(), f.Path))
 	}
-	sb.WriteString(fmt.Sprintf("\n%d identical files\n", unchanged))
+	sb.WriteString(fmt.Sprintf("\n%d total, %d identical files\n", len(d.Files), unchanged))
 	return sb.String()
+}
+
+func (d *FileDiff) FormatStatus() string {
+	st := fmt.Sprintf("%7s ", d.Status)
+	switch d.Status {
+	case statusUnchanged:
+		return st
+	case statusChanged:
+		return yellow(st)
+	case statusMoved:
+		return blue(st)
+	case statusAdded:
+		return green(st)
+	case statusDeleted:
+		return red(st)
+	}
+	return st
 }
