@@ -52,7 +52,7 @@ func (t *FileTree) calculate(path string, level int) error {
 }
 
 func NewFileDsc(path string, level int) (*FileDsc, error) {
-	stat, err := os.Stat(path)
+	stat, err := os.Lstat(path)
 	if err != nil {
 		return nil, err
 	}
@@ -65,8 +65,17 @@ func NewFileDsc(path string, level int) (*FileDsc, error) {
 		Level:   level,
 	}
 
-	if !stat.IsDir() {
+	// No need to generate a hash of directories, symlinks or other irregular files.
+	mode := stat.Mode()
+	if mode.IsRegular() {
 		dsc.Hash, err = fastHash(path, stat.Size())
+		if err != nil {
+			return nil, err
+		}
+	}
+	if mode&os.ModeSymlink != 0 {
+		// for a symlink simply use the link directly. No need to hash it since it's also limited in length.
+		dsc.Hash, err = os.Readlink(path)
 		if err != nil {
 			return nil, err
 		}
