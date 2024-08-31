@@ -60,12 +60,13 @@ func DiffTrees(t1, t2 *FileTree) *TreeDiff {
 		dir1ByPath[dsc1.Path] = dsc1
 	}
 
+t2loop:
 	for _, dsc2 := range t2.Files {
 		if dsc2.IsDir {
 			continue
 		}
 		if dsc1, ok := dir1ByPath[dsc2.Path]; ok {
-			if dsc1.Hash != dsc2.Hash {
+			if dsc1.Hash != dsc2.Hash || dsc1.Size != dsc2.Size {
 				res.Files = append(res.Files, &FileDiff{Status: statusChanged, FileDsc: dsc1})
 			} else {
 				res.Files = append(res.Files, &FileDiff{Status: statusUnchanged, FileDsc: dsc1})
@@ -74,12 +75,16 @@ func DiffTrees(t1, t2 *FileTree) *TreeDiff {
 			continue
 		}
 		// Let's try to find the file somewhere else:
-		if dsc1, ok := dir1ByHash[dsc2.Hash]; ok {
+		for _, dsc1 := range dir1ByHash[dsc2.Hash] {
+			// Ignore accidentally equal hashes if the files are of different sizes
+			if dsc1.Size != dsc2.Size {
+				continue
+			}
 			r := &FileDiff{Status: statusMoved, FileDsc: dsc2}
-			r.Path = dsc1[0].Path + " -> " + dsc2.Path
+			r.Path = dsc1.Path + " -> " + dsc2.Path
 			res.Files = append(res.Files, r)
 			matched[dsc2.Hash]++
-			continue
+			continue t2loop // Once we found one match we continue with the outer loop.
 		}
 		res.Files = append(res.Files, &FileDiff{Status: statusAdded, FileDsc: dsc2})
 	}
