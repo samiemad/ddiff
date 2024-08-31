@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	statusUnchanged = "UNCHANGED"
+	statusIdentical = "IDENTICAL"
 	statusChanged   = "CHANGED"
 	statusMoved     = "MOVED"
 	statusAdded     = "ADDED"
@@ -69,7 +69,7 @@ t2loop:
 			if dsc1.Hash != dsc2.Hash || dsc1.Size != dsc2.Size {
 				res.Files = append(res.Files, &FileDiff{Status: statusChanged, FileDsc: dsc1})
 			} else {
-				res.Files = append(res.Files, &FileDiff{Status: statusUnchanged, FileDsc: dsc1})
+				res.Files = append(res.Files, &FileDiff{Status: statusIdentical, FileDsc: dsc1})
 			}
 			matched[dsc1.Hash]++
 			continue
@@ -109,22 +109,29 @@ t2loop:
 
 func (d *TreeDiff) String() string {
 	var sb strings.Builder
-	unchanged := 0
+	counts := map[string]int{}
 	for _, f := range d.Files {
-		if f.Status == statusUnchanged {
-			unchanged++
+		counts[f.Status]++
+		if f.Status == statusIdentical {
 			continue
 		}
 		sb.WriteString(fmt.Sprintf("%s: %s\n", f.FormatStatus(), f.Path))
 	}
-	sb.WriteString(fmt.Sprintf("\n%d total, %d identical files\n", len(d.Files), unchanged))
+	sb.WriteString(colored(fmt.Sprintf("\nTotal     : %d \n", len(d.Files)), colorWhite, modeFont, styleOverline))
+
+	sb.WriteString(fmt.Sprintf("%s     : %d\n", green(statusAdded), counts[statusAdded]))
+	sb.WriteString(fmt.Sprintf("%s   : %d\n", red(statusDeleted), counts[statusDeleted]))
+	sb.WriteString(fmt.Sprintf("%s     : %d\n", blue(statusMoved), counts[statusMoved]))
+	sb.WriteString(fmt.Sprintf("%s   : %d\n", yellow(statusChanged), counts[statusChanged]))
+	sb.WriteString(fmt.Sprintf("%s : %d\n", statusIdentical, counts[statusIdentical]))
+
 	return sb.String()
 }
 
 func (d *FileDiff) FormatStatus() string {
 	st := fmt.Sprintf("%7s ", d.Status)
 	switch d.Status {
-	case statusUnchanged:
+	case statusIdentical:
 		return st
 	case statusChanged:
 		return yellow(st)
