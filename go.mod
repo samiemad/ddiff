@@ -1,4 +1,4 @@
-module samiemad.me/FastDiff
+module samiemad.me/ddiff
 
 go 1.23.0
 

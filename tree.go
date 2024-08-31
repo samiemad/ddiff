@@ -68,7 +68,7 @@ func NewFileDsc(path string, level int) (*FileDsc, error) {
 	// No need to generate a hash of directories, symlinks or other irregular files.
 	mode := stat.Mode()
 	if mode.IsRegular() {
-		dsc.Hash, err = fastHash(path, stat.Size())
+		dsc.Hash, err = dashHash(path, stat.Size())
 		if err != nil {
 			return nil, err
 		}
@@ -83,7 +83,7 @@ func NewFileDsc(path string, level int) (*FileDsc, error) {
 	return dsc, nil
 }
 
-func fastHash(path string, size int64) (string, error) {
+func dashHash(path string, size int64) (string, error) {
 	hash := sha256.New()
 	const minSize = 1024 * 32 // 32KB
 	const chunkSize = 1024 * 4
