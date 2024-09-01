@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"iter"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,7 +12,8 @@ import (
 )
 
 type FileTree struct {
-	Files []*FileDsc
+	Files   []*FileDsc
+	SubDirs []*FileTree
 }
 
 type FileDsc struct {
@@ -41,11 +43,11 @@ func calculate(path string, level int) (*FileTree, error) {
 		}
 		tree.Files = append(tree.Files, dsc)
 		if file.IsDir() {
-			f, err := calculate(filepath.Join(path, file.Name()), level+1)
+			sd, err := calculate(filepath.Join(path, file.Name()), level+1)
 			if err != nil {
 				return nil, err
 			}
-			tree.Files = append(tree.Files, f.Files...)
+			tree.SubDirs = append(tree.SubDirs, sd)
 		}
 	}
 	return tree, nil
@@ -111,7 +113,7 @@ func dashHash(path string, size int64) (string, error) {
 }
 
 func (t *FileTree) RemovePrefix(dir string) {
-	for _, dsc := range t.Files {
+	for dsc := range t.AllFiles() {
 		dsc.Path = strings.TrimPrefix(dsc.Path, dir)
 		dsc.Path = strings.TrimPrefix(dsc.Path, "/")
 	}
@@ -119,7 +121,7 @@ func (t *FileTree) RemovePrefix(dir string) {
 
 func (t *FileTree) String() string {
 	sb := strings.Builder{}
-	for _, dsc := range t.Files {
+	for dsc := range t.AllFiles() {
 		if dsc.IsDir {
 			sb.WriteString(fmt.Sprintf("%s+ %s %s\n", strings.Repeat("  ", dsc.Level), dsc.Name, dsc.ModTime.Format(time.RFC3339)))
 		} else {
@@ -128,4 +130,23 @@ func (t *FileTree) String() string {
 	}
 
 	return sb.String()
+}
+
+// AllFiles returns an iterator that yields the slice elements in order.
+func (t *FileTree) AllFiles() iter.Seq[*FileDsc] {
+	return func(yield func(dsc *FileDsc) bool) {
+		// Loop over all dirs:
+		for _, dir := range t.SubDirs {
+			for v := range dir.AllFiles() {
+				if !yield(v) {
+					return
+				}
+			}
+		}
+		for _, v := range t.Files {
+			if !yield(v) {
+				return
+			}
+		}
+	}
 }

@@ -53,7 +53,7 @@ func DiffTrees(t1, t2 *FileTree) *TreeDiff {
 	dir1ByHash := map[string][]*FileDsc{}
 	dir1ByPath := map[string]*FileDsc{}
 	matched := map[string]int{}
-	for _, dsc1 := range t1.Files {
+	for dsc1 := range t1.AllFiles() {
 		if dsc1.Hash != "" {
 			dir1ByHash[dsc1.Hash] = append(dir1ByHash[dsc1.Hash], dsc1)
 		}
@@ -61,7 +61,7 @@ func DiffTrees(t1, t2 *FileTree) *TreeDiff {
 	}
 
 t2loop:
-	for _, dsc2 := range t2.Files {
+	for dsc2 := range t2.AllFiles() {
 		if dsc2.IsDir {
 			continue
 		}
@@ -88,7 +88,7 @@ t2loop:
 		}
 		res.Files = append(res.Files, &FileDiff{Status: statusAdded, FileDsc: dsc2})
 	}
-	for _, dsc1 := range t1.Files {
+	for dsc1 := range t1.AllFiles() {
 		if dsc1.IsDir {
 			continue
 		}
