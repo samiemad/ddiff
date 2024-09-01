@@ -22,8 +22,8 @@ type TreeDiff struct {
 }
 
 type FileDiff struct {
-	Status string
-	*FileDsc
+	Status      string
+	left, right *FileDsc
 }
 
 func DiffDirs(dir1, dir2 string) (*TreeDiff, error) {
@@ -66,11 +66,11 @@ t2loop:
 			continue
 		}
 		if dsc1, ok := dir1ByPath[dsc2.Path]; ok {
+			d := &FileDiff{Status: statusIdentical, left: dsc1, right: dsc2}
 			if dsc1.Hash != dsc2.Hash || dsc1.Size != dsc2.Size {
-				res.Files = append(res.Files, &FileDiff{Status: statusChanged, FileDsc: dsc1})
-			} else {
-				res.Files = append(res.Files, &FileDiff{Status: statusIdentical, FileDsc: dsc1})
+				d.Status = statusChanged
 			}
+			res.Files = append(res.Files, d)
 			matched[dsc1.Hash]++
 			continue
 		}
@@ -80,13 +80,12 @@ t2loop:
 			if dsc1.Size != dsc2.Size {
 				continue
 			}
-			r := &FileDiff{Status: statusMoved, FileDsc: dsc2}
-			r.Path = dsc1.Path + " -> " + dsc2.Path
+			r := &FileDiff{Status: statusMoved, left: dsc1, right: dsc2}
 			res.Files = append(res.Files, r)
 			matched[dsc2.Hash]++
 			continue t2loop // Once we found one match we continue with the outer loop.
 		}
-		res.Files = append(res.Files, &FileDiff{Status: statusAdded, FileDsc: dsc2})
+		res.Files = append(res.Files, &FileDiff{Status: statusAdded, right: dsc2})
 	}
 	for dsc1 := range t1.AllFiles() {
 		if dsc1.IsDir {
@@ -94,17 +93,24 @@ t2loop:
 		}
 		num := matched[dsc1.Hash]
 		if num == 0 {
-			res.Files = append(res.Files, &FileDiff{Status: statusDeleted, FileDsc: dsc1})
+			res.Files = append(res.Files, &FileDiff{Status: statusDeleted, left: dsc1})
 		} else {
 			matched[dsc1.Hash]--
 		}
 	}
 
 	slices.SortStableFunc(res.Files, func(a, b *FileDiff) int {
-		return cmp.Compare(a.Path, b.Path)
+		return cmp.Compare(a.GetPath(), b.GetPath())
 	})
 
 	return res
+}
+
+func (d *FileDiff) GetPath() string {
+	if d.left != nil {
+		return d.left.Path
+	}
+	return d.right.Path
 }
 
 func (d *TreeDiff) String() string {
@@ -115,7 +121,7 @@ func (d *TreeDiff) String() string {
 		if f.Status == statusIdentical {
 			continue
 		}
-		sb.WriteString(fmt.Sprintf("%s: %s\n", f.FormatStatus(), f.Path))
+		sb.WriteString(f.String())
 	}
 	sb.WriteString(colored(fmt.Sprintf("\nTotal     : %d \n", len(d.Files)), colorWhite, modeFont, styleOverline))
 
@@ -126,6 +132,14 @@ func (d *TreeDiff) String() string {
 	sb.WriteString(fmt.Sprintf("%s : %d\n", statusIdentical, counts[statusIdentical]))
 
 	return sb.String()
+}
+
+func (d *FileDiff) String() string {
+	path := d.GetPath()
+	if d.Status == statusMoved {
+		path += blue(" -> ") + d.right.Path
+	}
+	return fmt.Sprintf("%s: %s\n", d.FormatStatus(), path)
 }
 
 func (d *FileDiff) FormatStatus() string {
