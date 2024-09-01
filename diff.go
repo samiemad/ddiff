@@ -43,8 +43,8 @@ func DiffDirs(dir1, dir2 string) (*TreeDiff, error) {
 	if err != nil {
 		return nil, err
 	}
-	t1.RemovePrefix()
-	t2.RemovePrefix()
+	t1.RemovePrefix(dir1)
+	t2.RemovePrefix(dir2)
 	return DiffTrees(t1, t2), nil
 }
 

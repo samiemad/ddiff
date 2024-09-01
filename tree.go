@@ -11,7 +11,6 @@ import (
 )
 
 type FileTree struct {
-	Dir   string
 	Files []*FileDsc
 }
 
@@ -26,29 +25,30 @@ type FileDsc struct {
 }
 
 func Tree(dir string) (*FileTree, error) {
-	tree := &FileTree{Dir: dir}
-	return tree, tree.calculate("", 0)
+	return calculate(dir, 0)
 }
 
-func (t *FileTree) calculate(path string, level int) error {
-	entries, err := os.ReadDir(filepath.Join(t.Dir, path))
+func calculate(path string, level int) (*FileTree, error) {
+	tree := &FileTree{}
+	entries, err := os.ReadDir(path)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	for _, file := range entries {
-		dsc, err := NewFileDsc(filepath.Join(t.Dir, path, file.Name()), level)
+		dsc, err := NewFileDsc(filepath.Join(path, file.Name()), level)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		t.Files = append(t.Files, dsc)
+		tree.Files = append(tree.Files, dsc)
 		if file.IsDir() {
-			err := t.calculate(filepath.Join(path, file.Name()), level+1)
+			f, err := calculate(filepath.Join(path, file.Name()), level+1)
 			if err != nil {
-				return err
+				return nil, err
 			}
+			tree.Files = append(tree.Files, f.Files...)
 		}
 	}
-	return nil
+	return tree, nil
 }
 
 func NewFileDsc(path string, level int) (*FileDsc, error) {
@@ -110,9 +110,9 @@ func dashHash(path string, size int64) (string, error) {
 	return hex.EncodeToString(hash.Sum(nil)), nil
 }
 
-func (t *FileTree) RemovePrefix() {
+func (t *FileTree) RemovePrefix(dir string) {
 	for _, dsc := range t.Files {
-		dsc.Path = strings.TrimPrefix(dsc.Path, t.Dir)
+		dsc.Path = strings.TrimPrefix(dsc.Path, dir)
 		dsc.Path = strings.TrimPrefix(dsc.Path, "/")
 	}
 }
