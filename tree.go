@@ -27,6 +27,20 @@ type FileDsc struct {
 
 func Tree(dir string) (*FileTree, error) {
 	tree := &FileTree{Dir: dir}
+	s, err := os.Lstat(dir)
+	if err != nil {
+		return nil, err
+	}
+	if !s.IsDir() {
+		dsc, err := NewFileDsc(dir, 0)
+		if err != nil {
+			return nil, err
+		}
+		return &FileTree{
+			Dir:   dir,
+			Files: []*FileDsc{dsc},
+		}, nil
+	}
 	return tree, tree.calculate("", 0)
 }
 
